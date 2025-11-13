@@ -1,0 +1,2 @@
+# ChaosZeroNightmareSaveDataSize
+カオスゼロナイトメアのセーブデータ容量計算ツール
