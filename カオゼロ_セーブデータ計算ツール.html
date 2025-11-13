@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>カオスゼロナイトメア セーブデータ容量計算ツール</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Slate 900 - Deep Dark Blue */
+        }
+        .card-shadow {
+            box-shadow: 0 0 10px rgba(79, 70, 229, 0.5); /* Indigo glow */
+            border: 1px solid #4f46e5;
+        }
+        .tab-active {
+            background-color: #4f46e5; /* Indigo 600 */
+            color: #ffffff;
+            box-shadow: 0 0 8px rgba(129, 140, 248, 0.7); /* Light indigo glow */
+        }
+        .tab-inactive {
+            background-color: #1f2937; /* Gray 800 */
+            color: #9ca3af; /* Gray 400 */
+            border: 1px solid #374151;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield; /* Firefox */
+        }
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .input-bg {
+            background-color: #1e293b; /* Slate 800 */
+            border: 1px solid #334155; /* Slate 700 */
+            color: #e2e8f0; /* Slate 200 */
+        }
+        /* New styles for button controls */
+        .control-btn {
+            width: 2.5rem; /* 40px */
+            height: 2.5rem; /* 40px */
+            border-radius: 0.5rem; /* rounded */
+            font-size: 1.25rem;
+            line-height: 1;
+            font-weight: 700;
+            transition: all 0.2s;
+        }
+        .control-btn:hover {
+            transform: scale(1.05);
+        }
+        .btn-minus {
+            background-color: #ef4444; /* Red 500 */
+            box-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
+        }
+        .btn-plus {
+            background-color: #10b981; /* Green 500 */
+            box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);
+        }
+        .count-display {
+            min-width: 3rem; 
+            text-align: center;
+            font-size: 1.125rem;
+            padding: 0.25rem 0.25rem;
+            background-color: #0f172a; 
+            border: 1px solid #334155;
+            box-shadow: 0 0 5px rgba(51, 65, 85, 0.5); 
+        }
+
+        /* 入力行のレイアウト */
+        .input-row-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem;
+            background-color: #1f2937; /* Gray 800 */
+            border-radius: 0.75rem;
+            border: 1px solid #374151;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .note-text {
+            /* flex-col内に<br>が入ったため、HTMLレンダリングを有効にする */
+            line-height: 1.4;
+        }
+        .cost-detail {
+            font-size: 0.75rem; /* text-xs */
+            font-weight: 600; /* font-semibold */
+            color: #94a3b8; /* Slate 400 */
+            margin-left: 0.5rem;
+            display: block; /* 常に横並びを意識 */
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8 min-h-screen">
+
+    <div id="app" class="max-w-5xl mx-auto">
+        <h1 class="text-3xl sm:text-4xl font-extrabold text-white mb-8 text-center tracking-wider">
+            カオスゼロナイトメア セーブデータ容量計算
+        </h1>
+
+        <!-- 1. 基本情報と最大容量 (修正1: 上下段レイアウトに戻す) -->
+        <div class="bg-gray-900 p-6 sm:p-8 rounded-xl card-shadow mb-8">
+            <h2 class="text-2xl font-bold text-indigo-400 mb-4 border-b border-indigo-700 pb-2 text-center">セーブデータ基本設定</h2>
+            
+            <div class="space-y-6"> 
+                
+                <!-- ティア設定 -->
+                <div>
+                    <label for="tier" class="block text-sm font-medium text-gray-300 mb-2">カオス ティア</label>
+                    <input type="number" id="tier" value="1" min="1" oninput="updateTier(this)"
+                        class="w-full p-3 input-bg rounded-lg text-lg focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+
+                <!-- セーブデータ容量結果表示 -->
+                <div class="p-5 bg-indigo-900/40 rounded-lg border border-indigo-700 flex flex-col justify-center">
+                    <p class="text-sm font-semibold text-gray-300 mb-2">最大セーブデータ容量</p>
+                    <p class="text-xl font-extrabold text-white">
+                        <span class="text-yellow-300 text-3xl mr-1" id="max-pt">30</span> Pt
+                    </p>
+                    <p class="text-xs text-gray-400 mt-1">※ 30pt + (Tier - 1) x 10pt</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. 消費コスト入力（左右分割） -->
+        <div class="bg-gray-900 p-6 sm:p-8 rounded-xl card-shadow mb-8">
+            <h2 class="text-2xl font-bold text-cyan-400 mb-4 border-b border-cyan-700 pb-2 text-center">所持カードとカオス内アクション</h2>
+
+            <div class="flex justify-center space-x-2 mb-6">
+                <button class="px-3 sm:px-6 py-2 rounded-full font-bold transition duration-200 tab-active"
+                    id="tab-A" onclick="switchTab('A')" data-char="A">キャラクター A</button>
+                <button class="px-3 sm:px-6 py-2 rounded-full font-bold transition duration-200 tab-inactive"
+                    id="tab-B" onclick="switchTab('B')" data-char="B">キャラクター B</button>
+                <button class="px-3 sm:px-6 py-2 rounded-full font-bold transition duration-200 tab-inactive"
+                    id="tab-C" onclick="switchTab('C')" data-char="C">キャラクター C</button>
+            </div>
+            
+            <!-- 修正2: キャラクター名入力欄をタブの下に移動し、挙動を調整 -->
+            <div id="char-name-container" class="mb-8 px-4">
+                <label for="char-name" class="block text-sm font-medium text-gray-300 mb-2">選択中キャラクター名</label>
+                <input type="text" id="char-name" value="" placeholder="キャラクター A" oninput="updateName(this)"
+                    class="w-full p-3 input-bg rounded-lg text-lg focus:ring-indigo-500 focus:border-indigo-500" maxlength="15">
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- 左：所持カード -->
+                <div>
+                    <h3 class="text-xl font-semibold text-gray-200 mb-4 text-center py-2 bg-slate-800 rounded-lg border-b border-cyan-500/50">所持カード</h3>
+                    <div id="card-inputs" class="space-y-4">
+                        <!-- Inputs generated by JS with buttons -->
+                    </div>
+                    <p class="text-xs text-gray-500 mt-4 px-2">※固有カード・装備は鮮明な記憶としてコスト0ptです。</p>
+                </div>
+
+                <!-- 右：カオス内アクション -->
+                <div>
+                    <h3 class="text-xl font-semibold text-gray-200 mb-4 text-center py-2 bg-slate-800 rounded-lg border-b border-cyan-500/50">カオス内アクション</h3>
+                    <div id="action-inputs" class="space-y-4">
+                        <!-- Inputs generated by JS with buttons -->
+                    </div>
+                </div>
+            </div>
+
+                <!-- 合計コスト表示 -->
+                <div class="mt-8 p-4 bg-cyan-900/40 rounded-lg border border-cyan-700 text-center">
+                    <p class="text-lg font-semibold text-gray-300">
+                        純粋な追加コスト:
+                        <span id="total-cost-final" class="text-red-400 font-bold text-3xl ml-2">0</span> Pt
+                        <span class="text-lg text-gray-400">／</span>
+                        <span id="max-pt-final" class="text-cyan-400 font-bold text-2xl">30</span> pt (最大容量)
+                    </p>
+                </div>
+        </div>
+
+        <!-- 3. 最終結果 (修正3: タイトル変更) -->
+        <div class="p-6 sm:p-8 rounded-xl border border-gray-700 bg-gray-900/50">
+            <h2 class="text-2xl font-bold text-red-400 mb-6 text-center border-b border-red-700 pb-2">キャラクター別セーブデータ使用量</h2>
+            
+            <div id="final-summary" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- 結果はJSで動的に生成 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // コスト定数
+        const COSTS = [
+            { id: 'common_card', label: '共用カード', cost: 20, type: 'card', note: '※ 単価: +20pt' },
+            { id: 'monster_card', label: 'モンスターカード', cost: 80, type: 'card', note: '※ 単価: +80pt' }, 
+            { id: 'normal_hirameki', label: '通常ヒラメキ', cost: 10, type: 'card', 
+              note: '※ 単価: +10pt <br>※ 共用・モンスターカードが対象 <br>※ 開始・ヒラメキカードは0pt' }, 
+            { id: 'god_hirameki', label: '神ヒラメキ', cost: 20, type: 'card', 
+              note: '※ 単価: +20pt <br>※ 開始・ヒラメキカード含めた全カード対象' }, 
+
+            { id: 'convert_card', label: 'カード変換回数', cost: 10, type: 'action', 
+              note: '※ 単価: +10pt' }, 
+              
+            { id: 'copy_card', label: 'カードコピー回数', cost: 0, type: 'action', // コストはロジックで計算
+              note: '※ 回数に応じて: 0pt, 10pt, 30pt, 50pt, 70pt (以降70pt固定) <br>※ コピーで増加したカードのポイントは別途加算してください。' }, 
+            
+            // 修正1: 注釈追加
+            { id: 'exclude_cumulative', label: 'カード排除回数 (累積コスト)', cost: 0, type: 'action', 
+              note: '※ 累積コスト（0pt, +10pt, +40pt...）を計算します。 <br>※ 開始・ヒラメキカードを排除する場合は合わせて⇩の開始・ヒラメキカード排除回数をカウントしてください。' }, 
+            
+            { id: 'exclude_start_hirameki_fixed', label: '開始・ヒラメキカード排除回数 (固定コスト)', cost: 20, type: 'action', 
+              note: '※ この回数分、一律 +20pt が加算されます。' } 
+        ];
+
+        // 状態管理（キャラクターA, B, Cのデータ）
+        let calculatorState = {
+            activeCharacter: 'A',
+            A: { name: 'キャラクター A', tier: 1, costs: {} },
+            B: { name: 'キャラクター B', tier: 1, costs: {} },
+            C: { name: 'キャラクター C', tier: 1, costs: {} }
+        };
+
+        // 初期化処理
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeState();
+            initializeInputGroups();
+            calculatePt(); 
+            
+            // 修正2: 初期ロード時にキャラクター名をPlaceholderとして設定
+            document.getElementById('char-name').value = "";
+            document.getElementById('char-name').placeholder = calculatorState.A.name;
+        });
+
+        // 状態オブジェクトの初期化
+        function initializeState() {
+            ['A', 'B', 'C'].forEach(char => {
+                COSTS.forEach(item => {
+                    calculatorState[char].costs[item.id] = 0;
+                });
+            });
+        }
+
+        // 入力グループの動的生成 (前回のコードから変更なし)
+        function initializeInputGroups() {
+            const cardContainer = document.getElementById('card-inputs');
+            const actionContainer = document.getElementById('action-inputs');
+            
+            cardContainer.innerHTML = '';
+            actionContainer.innerHTML = '';
+
+            COSTS.forEach(item => {
+                const container = item.type === 'card' ? cardContainer : actionContainer;
+                
+                const div = document.createElement('div');
+                div.className = 'input-row-card'; 
+                
+                div.innerHTML = `
+                    <div class="w-full flex flex-col mb-2">
+                        <label class="block text-base font-medium text-gray-300">${item.label}</label>
+                        <span class="text-xs font-mono text-gray-500 note-text whitespace-normal">${item.note}</span>
+                    </div>
+
+                    <div class="w-full flex items-center justify-between pt-2 border-t border-gray-700/50">
+                        <!-- 左：総コスト表示 -->
+                        <div class="flex flex-col">
+                            <span class="text-xs text-gray-500">消費Pt:</span>
+                            <div class="flex items-baseline">
+                                <span id="cost-pt-${item.id}" class="text-xl font-bold text-gray-400">+0 Pt</span>
+                                <!-- 累積コストの内訳表示領域 -->
+                                <span id="cost-detail-${item.id}" class="cost-detail"></span>
+                            </div>
+                        </div>
+                        
+                        <!-- 右：コントロール -->
+                        <div class="flex items-center space-x-1">
+                            <button class="control-btn btn-minus text-white" onclick="adjustCost('${item.id}', -1)">-</button>
+                            <span id="display-${item.id}" class="count-display rounded-md text-white font-bold">0</span>
+                            <button class="control-btn btn-plus text-white" onclick="adjustCost('${item.id}', 1)">+</button>
+                        </div>
+                    </div>
+                `;
+                div.querySelector('.note-text').innerHTML = item.note; 
+                container.appendChild(div);
+            });
+        }
+
+        // コスト調整機能 (前回のコードから変更なし)
+        function adjustCost(id, delta) {
+            const char = calculatorState.activeCharacter;
+            let currentValue = calculatorState[char].costs[id];
+            
+            let newValue = currentValue + delta;
+            
+            if (newValue < 0) {
+                newValue = 0; // Prevent negative counts
+            }
+
+            // 1. Update state
+            calculatorState[char].costs[id] = newValue;
+            
+            // 2. Update display
+            document.getElementById(`display-${id}`).textContent = newValue;
+            
+            // 3. Recalculate everything
+            calculatePt();
+        }
+
+        // 修正2: キャラクター名更新ロジックを調整
+        function updateName(inputElement) {
+            const char = calculatorState.activeCharacter;
+            const defaultName = `キャラクター ${char}`;
+            
+            // 入力値が空であれば、内部状態はデフォルト名に戻す
+            const newName = inputElement.value.trim() || defaultName; 
+            calculatorState[char].name = newName;
+            
+            // タブ名も更新
+            document.getElementById(`tab-${char}`).textContent = newName;
+            
+            // サマリー表示も更新するため再計算
+            calculatePt();
+        }
+
+        function switchTab(newChar) {
+            const activeChar = calculatorState.activeCharacter;
+            saveCurrentState(activeChar); // 現在のティアと名前を保存
+
+            document.getElementById(`tab-${activeChar}`).className = document.getElementById(`tab-${activeChar}`).className.replace('tab-active', 'tab-inactive');
+            document.getElementById(`tab-${newChar}`).className = document.getElementById(`tab-${newChar}`).className.replace('tab-inactive', 'tab-active');
+            calculatorState.activeCharacter = newChar;
+            loadState(newChar); // 新しいキャラクターのティアと名前をロード
+            calculatePt();
+        }
+
+        function saveCurrentState(char) {
+            const state = calculatorState[char];
+            // tierは常に基本設定のinputから取得（Tierはキャラクター間で共有されない）
+            state.tier = parseInt(document.getElementById('tier').value) || 1; 
+            
+            // 名前はアクティブな入力欄から取得し、空の場合は内部でデフォルト名を使う (修正2)
+            const inputName = document.getElementById('char-name').value.trim();
+            const defaultName = `キャラクター ${char}`;
+            state.name = inputName || defaultName;
+        }
+
+        // 修正2: ロード時に内部状態の名前を入力欄に反映するロジックを調整
+        function loadState(char) {
+            const state = calculatorState[char];
+            const defaultName = `キャラクター ${char}`;
+
+            document.getElementById('tier').value = state.tier;
+            
+            // 内部状態がデフォルト名なら入力欄は空にしてplaceholderを表示、そうでなければ名前を表示
+            if (state.name === defaultName) {
+                 document.getElementById('char-name').value = ""; // 入力欄は空
+                 document.getElementById('char-name').placeholder = defaultName; // placeholderにデフォルト名
+            } else {
+                 document.getElementById('char-name').value = state.name; // 名前をロード
+                 document.getElementById('char-name').placeholder = defaultName; // placeholderはデフォルト名
+            }
+
+            // タブのテキストも名前で更新
+            document.getElementById(`tab-${char}`).textContent = state.name;
+
+            COSTS.forEach(item => {
+                const count = state.costs[item.id];
+                const displayElement = document.getElementById(`display-${item.id}`);
+                if (displayElement) {
+                    displayElement.textContent = count;
+                }
+            });
+        }
+
+        function updateTier(inputElement) {
+            if (inputElement.value < 1 || inputElement.value === "") { 
+                inputElement.value = 1;
+            }
+            const char = calculatorState.activeCharacter;
+            // Tierもキャラクターごとに保存する
+            calculatorState[char].tier = parseInt(inputElement.value) || 1;
+            calculatePt();
+        }
+        
+        // --- コスト計算ロジック (前回のコードから変更なし) ---
+        
+        // 累積加算の総コストを計算する関数
+        // 差分Pt: 1回目: 0, 2回目: 10, 3回目: 30, 4回目: 50, 5回目以降: 70
+        function calculateTotalCumulativeCost(count) {
+            if (count <= 0) return { totalCost: 0, detail: "" };
+
+            let totalCost = 0;
+            let detail = [];
+            // 1回目, 2回目, 3回目, 4回目に加算される差分Pt
+            const diffCosts = [0, 10, 30, 50]; 
+
+            for (let i = 1; i <= count; i++) {
+                let diff;
+                if (i <= 4) {
+                    diff = diffCosts[i - 1];
+                } else {
+                    // 5回目以降は70で固定
+                    diff = 70;
+                }
+                totalCost += diff;
+                detail.push(diff === 0 ? '+0' : `+${diff}`);
+            }
+            return { totalCost, detail: `(${detail.join(' ')})` };
+        }
+
+        // ヘルパー関数: 個別コスト表示の更新 (アクティブキャラクターのみ) (前回のコードから変更なし)
+        const updateIndividualCostDisplay = (char, id, cost, detail = "") => {
+            if (char !== calculatorState.activeCharacter) return;
+            
+            const costElement = document.getElementById(`cost-pt-${id}`);
+            const detailElement = document.getElementById(`cost-detail-${id}`);
+
+            if (costElement) {
+                // コストの色付けルール
+                let colorClass = 'text-gray-400';
+                if (cost > 0) {
+                    // +Pt は赤（コスト増）
+                    colorClass = 'text-red-400';
+                }
+
+                costElement.textContent = `${cost >= 0 ? '+' : ''}${cost} Pt`;
+                costElement.className = `text-xl font-bold ${colorClass}`;
+            }
+
+            if (detailElement) {
+                 detailElement.textContent = detail;
+            }
+        };
+
+        // キャラクターごとの容量とコストを計算するメイン関数
+        function calculateCharacterResult(char) {
+            const state = calculatorState[char];
+            const tier = state.tier;
+            
+            // 1. 最大容量の計算
+            const maxPt = 30 + (tier - 1) * 10;
+
+            let totalCost = 0; // 純粋な追加コスト (使用量)
+
+            // 2. 所持カードコストの計算と表示
+            COSTS.filter(item => item.type === 'card').forEach(item => {
+                const count = state.costs[item.id];
+                const cost = item.cost * count;
+                totalCost += cost;
+                updateIndividualCostDisplay(char, item.id, cost);
+            });
+            
+            // 3. 特殊アクションコストの計算と表示
+
+            // 3-0. カード変換回数の計算
+            const convertCount = state.costs['convert_card'];
+            const convertCost = convertCount * 10;
+            totalCost += convertCost;
+            updateIndividualCostDisplay(char, 'convert_card', convertCost);
+            
+            // 3-1. カードコピーの計算
+            const copyCount = state.costs['copy_card'];
+            const { totalCost: copyCumulativeCost, detail: copyDetail } = calculateTotalCumulativeCost(copyCount);
+            
+            totalCost += copyCumulativeCost;
+            updateIndividualCostDisplay(char, 'copy_card', copyCumulativeCost, copyDetail);
+
+            // 3-2. 排除アクションの計算 (累積コスト)
+            const excludeCumulativeCount = state.costs['exclude_cumulative'];
+            const { totalCost: excludeCumulativeCost, detail: excludeDetail } = calculateTotalCumulativeCost(excludeCumulativeCount);
+            totalCost += excludeCumulativeCost;
+            updateIndividualCostDisplay(char, 'exclude_cumulative', excludeCumulativeCost, excludeDetail);
+
+            // 3-3. 排除アクションの計算 (固定コスト)
+            const startHiramekiFixedCount = state.costs['exclude_start_hirameki_fixed'];
+            const startHiramekiCost_fixed = startHiramekiFixedCount * COSTS.find(item => item.id === 'exclude_start_hirameki_fixed').cost; // 20pt/回
+            totalCost += startHiramekiCost_fixed;
+            updateIndividualCostDisplay(char, 'exclude_start_hirameki_fixed', startHiramekiCost_fixed);
+
+            // 4. 最終結果
+            // 修正4: 超過Ptの計算ロジックを変更 (使用量 - 最大容量)
+            const exceededPt = Math.max(0, totalCost - maxPt);
+
+            return { maxPt, totalCost, exceededPt, name: state.name };
+        }
+
+
+        // メイン計算ロジック
+        function calculatePt() {
+            const activeChar = calculatorState.activeCharacter;
+            
+            // 1. アクティブキャラクターのTierと名前を保存
+            saveCurrentState(activeChar);
+
+            // 2. アクティブキャラクターの結果を計算し、フォームに反映
+            const activeResult = calculateCharacterResult(activeChar);
+
+            // 中間合計コスト表示を更新
+            document.getElementById('total-cost-final').textContent = activeResult.totalCost;
+            document.getElementById('max-pt-final').textContent = activeResult.maxPt;
+            document.getElementById('max-pt').textContent = activeResult.maxPt; // 基本設定の最大容量も更新
+
+            // 3. 全キャラクターの結果を計算し、サマリーに表示
+            const summaryContainer = document.getElementById('final-summary');
+            summaryContainer.innerHTML = ''; // Clear previous results
+
+            ['A', 'B', 'C'].forEach(char => {
+                const state = calculatorState[char];
+                const result = calculateCharacterResult(char);
+                const charName = result.name || `キャラクター ${char}`;
+                const tier = state.tier;
+
+                let statusHtml = '';
+                // 修正4: 超過が発生している場合、+記号を削除
+                if (result.exceededPt > 0) {
+                    statusHtml = `<p class="text-red-400 font-bold mt-2 text-sm">超過: ${result.exceededPt} Pt</p>`;
+                }
+                
+                const charCard = document.createElement('div');
+                charCard.className = `p-4 rounded-xl border-2 transition duration-200 ${char === activeChar ? 'border-indigo-400 bg-gray-800' : 'border-gray-700 bg-gray-800/50'}`;
+                
+                // 修正4: 使用量の前に「現在」を追加
+                charCard.innerHTML = `
+                    <p class="text-xl font-bold ${char === activeChar ? 'text-indigo-300' : 'text-gray-300'}">
+                        ${charName}
+                    </p>
+                    <div class="mt-2">
+                        <p class="text-2xl font-extrabold text-white">
+                            現在${result.totalCost} <span class="text-lg font-normal">pt</span> <span class="text-base text-gray-400">使用</span>
+                        </p>
+                        <p class="text-sm text-gray-500 mt-1">
+                            (最大容量: ${result.maxPt} pt)
+                        </p>
+                        ${statusHtml}
+                    </div>
+                `;
+                summaryContainer.appendChild(charCard);
+            });
+        }
+    </script>
+</body>
+</html>
